@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <link rel="stylesheet" href="xterm.css">
+  <style>
+    html,body,#terminal{width:100%;height:100%;margin:0;background:#0b0d10;overflow:hidden}
+    #terminal{padding:8px 4px 4px 8px;box-sizing:border-box}
+    .xterm{font-size:13px;font-feature-settings:"liga" 0}
+    .xterm-viewport{scrollbar-width:thin;scrollbar-color:#39414a transparent}
+  </style>
+</head>
+<body>
+<div id="terminal"></div>
+<script src="xterm.js"></script>
+<script src="addon-fit.js"></script>
+<script>
+  const decoder = new TextDecoder('utf-8');
+  const term = new Terminal({
+    cursorBlink: true,
+    cursorStyle: 'block',
+    fontFamily: 'monospace',
+    fontSize: 13,
+    lineHeight: 1.15,
+    scrollback: 10000,
+    allowProposedApi: true,
+    theme: {
+      background: '#0b0d10', foreground: '#e5e7eb', cursor: '#a3e635',
+      selectionBackground: '#3f4b35', black: '#0b0d10', brightBlack: '#6b7280',
+      green: '#a3e635', brightGreen: '#bef264', cyan: '#67e8f9', brightCyan: '#a5f3fc'
+    }
+  });
+  const fit = new FitAddon.FitAddon();
+  term.loadAddon(fit);
+  term.open(document.getElementById('terminal'));
+  let ctrl = false;
+  term.onData(data => {
+    if (ctrl && data.length === 1) {
+      const code = data.toUpperCase().charCodeAt(0);
+      if (code >= 64 && code <= 95) data = String.fromCharCode(code - 64);
+      ctrl = false;
+    }
+    AndroidTerminal.send(data);
+  });
+  term.onResize(size => AndroidTerminal.resize(size.cols, size.rows));
+  function fitTerminal() {
+    try { fit.fit(); } catch (_) {}
+  }
+  window.addEventListener('resize', () => setTimeout(fitTerminal, 100));
+  window.terminalWriteBase64 = value => {
+    const binary = atob(value);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    term.write(decoder.decode(bytes, {stream: true}));
+  };
+  window.sendSpecial = key => {
+    const values = {ESC:'\x1b', TAB:'\t', UP:'\x1b[A', DOWN:'\x1b[B', LEFT:'\x1b[D', RIGHT:'\x1b[C', CTRL_C:'\x03'};
+    if (values[key] !== undefined) AndroidTerminal.send(values[key]);
+  };
+  window.toggleCtrl = () => { ctrl = !ctrl; return ctrl; };
+  window.focusTerminal = () => { fitTerminal(); term.focus(); };
+  fitTerminal();
+  AndroidTerminal.ready();
+</script>
+</body>
+</html>
